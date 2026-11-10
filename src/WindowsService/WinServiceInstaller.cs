@@ -31,7 +31,7 @@ namespace WinMemoryCleaner
             _serviceInstaller = new ServiceInstaller
             {
                 DelayedAutoStart = true,
-                Description = Constants.App.Repository.Uri.ToString(),
+                Description = Constants.App.Title,
                 DisplayName = Constants.App.Title,
                 ServiceName = Constants.App.Name,
                 StartType = ServiceStartMode.Automatic

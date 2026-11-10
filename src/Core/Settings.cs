@@ -32,8 +32,6 @@ namespace WinMemoryCleaner
 
         public static int AutoOptimizationMemoryUsage { get; set; }
 
-        public static bool AutoUpdate { get; set; }
-
         public static bool CloseAfterOptimization { get; set; }
 
         public static bool CloseToTheNotificationArea { get; set; }
@@ -96,7 +94,6 @@ namespace WinMemoryCleaner
             AlwaysOnTop = false;
             AutoOptimizationInterval = 0;
             AutoOptimizationMemoryUsage = 0;
-            AutoUpdate = true;
             CloseAfterOptimization = false;
             CloseToTheNotificationArea = false;
             CompactMode = false;
@@ -148,7 +145,6 @@ namespace WinMemoryCleaner
                         AlwaysOnTop = Convert.ToBoolean(key.GetValue(Helper.NameOf(() => AlwaysOnTop), AlwaysOnTop), _culture);
                         AutoOptimizationInterval = Convert.ToInt32(key.GetValue(Helper.NameOf(() => AutoOptimizationInterval), AutoOptimizationInterval), _culture);
                         AutoOptimizationMemoryUsage = Convert.ToInt32(key.GetValue(Helper.NameOf(() => AutoOptimizationMemoryUsage), AutoOptimizationMemoryUsage), _culture);
-                        AutoUpdate = Convert.ToBoolean(key.GetValue(Helper.NameOf(() => AutoUpdate), AutoUpdate), _culture);
                         CloseAfterOptimization = Convert.ToBoolean(key.GetValue(Helper.NameOf(() => CloseAfterOptimization), CloseAfterOptimization), _culture);
                         CloseToTheNotificationArea = Convert.ToBoolean(key.GetValue(Helper.NameOf(() => CloseToTheNotificationArea), CloseToTheNotificationArea), _culture);
                         CompactMode = Convert.ToBoolean(key.GetValue(Helper.NameOf(() => CompactMode), CompactMode), _culture);
@@ -263,7 +259,8 @@ namespace WinMemoryCleaner
                         key.SetValue(Helper.NameOf(() => AlwaysOnTop), AlwaysOnTop ? 1 : 0);
                         key.SetValue(Helper.NameOf(() => AutoOptimizationInterval), AutoOptimizationInterval);
                         key.SetValue(Helper.NameOf(() => AutoOptimizationMemoryUsage), AutoOptimizationMemoryUsage);
-                        key.SetValue(Helper.NameOf(() => AutoUpdate), AutoUpdate ? 1 : 0);
+                        // Remove the old updater preference when upgrading this fork.
+                        key.DeleteValue("AutoUpdate", false);
                         key.SetValue(Helper.NameOf(() => CloseAfterOptimization), CloseAfterOptimization ? 1 : 0);
                         key.SetValue(Helper.NameOf(() => CloseToTheNotificationArea), CloseToTheNotificationArea ? 1 : 0);
                         key.SetValue(Helper.NameOf(() => CompactMode), CompactMode ? 1 : 0);

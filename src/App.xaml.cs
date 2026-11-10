@@ -1,6 +1,5 @@
 ﻿using Microsoft.Win32;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -12,6 +11,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace WinMemoryCleaner
@@ -26,8 +26,8 @@ namespace WinMemoryCleaner
         private static bool _isRunning;
         private static Mutex _mutex;
         private static NotifyIcon _notifyIcon;
-        private static readonly List<string> _notifications = new List<string>();
-        private static readonly object _showHidelock = new object();
+        private static EventWaitHandle _showWindowEvent;
+        private static RegisteredWaitHandle _showWindowWait;
 
         #endregion
 
@@ -116,6 +116,18 @@ namespace WinMemoryCleaner
             {
                 Logger.Dispose();
 
+                if (_showWindowWait != null)
+                {
+                    _showWindowWait.Unregister(null);
+                    _showWindowWait = null;
+                }
+
+                if (_showWindowEvent != null)
+                {
+                    _showWindowEvent.Close();
+                    _showWindowEvent = null;
+                }
+
                 try
                 {
                     SystemEvents.PowerModeChanged -= OnPowerModeChanged;
@@ -187,22 +199,6 @@ namespace WinMemoryCleaner
 
             // App priority
             SetPriority(Settings.RunOnPriority);
-        }
-
-        /// <summary>
-        /// Navigates the specified URI.
-        /// </summary>
-        /// <param name="uri">The URI.</param>
-        public static void Navigate(Uri uri)
-        {
-            if (uri == null)
-                return;
-
-            using (Process.Start(new ProcessStartInfo
-            {
-                FileName = uri.AbsoluteUri,
-                UseShellExecute = true
-            })) { }
         }
 
         /// <summary>
@@ -292,16 +288,6 @@ namespace WinMemoryCleaner
         private void OnProcessExit(object sender, EventArgs e)
         {
             Dispose();
-
-            try
-            {
-                if (Updater.Process != null)
-                    Process.Start(Updater.Process);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Error starting update process." + ex);
-            }
         }
 
         /// <summary>
@@ -311,79 +297,83 @@ namespace WinMemoryCleaner
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         private void OnNotifyIconClick(object sender, System.Windows.Forms.MouseEventArgs e)
         {
-            lock (_showHidelock)
+            switch (e.Button)
             {
-                switch (e.Button)
-                {
-                    // Show/Hide
-                    case MouseButtons.Left:
-                        if (MainWindow == null)
-                            return;
-
-                        if (MainWindow.OwnedWindows.Cast<View>().Any(window => window != null && window.IsDialog))
-                        {
-                            MainWindow.Activate();
-                            MainWindow.Topmost = true;
-                            MainWindow.Topmost = Settings.AlwaysOnTop;
-
-                            return;
-                        }
-
-                        switch (MainWindow.Visibility)
-                        {
-                            case Visibility.Collapsed:
-                            case Visibility.Hidden:
-                                MainWindow.Show();
-
-                                MainWindow.WindowState = WindowState.Normal;
-
-                                MainWindow.Activate();
-                                MainWindow.Focus();
-
-                                MainWindow.Topmost = true;
-                                MainWindow.Topmost = Settings.AlwaysOnTop;
-                                MainWindow.ShowInTaskbar = true;
-
-                                // Focus the Optimize button when restoring from notification area
-                                MainWindow.Dispatcher.BeginInvoke((Action)(() =>
-                                {
-                                    var mainWindow = MainWindow as MainWindow;
-
-                                    if (mainWindow != null)
-                                    {
-                                        var optimizeButton = mainWindow.FindName("Optimize") as UIElement;
-
-                                        if (optimizeButton != null)
-                                        {
-                                            Keyboard.Focus(optimizeButton);
-                                            FocusManager.SetFocusedElement(mainWindow, optimizeButton);
-                                        }
-                                    }
-                                }), DispatcherPriority.ApplicationIdle);
-                                break;
-
-                            case Visibility.Visible:
-                                MainWindow.Hide();
-
-                                MainWindow.ShowInTaskbar = false;
-                                break;
-                        }
-
-                        ReleaseMemory();
+                case MouseButtons.Left:
+                    if (MainWindow == null)
                         return;
 
-                    // Optimize
-                    case MouseButtons.Middle:
-                        if (!Settings.TrayIconOptimizeOnMiddleMouseClick)
-                            return;
+                    if (MainWindow.IsVisible && MainWindow.WindowState != WindowState.Minimized &&
+                        !MainWindow.OwnedWindows.Cast<Window>().Any(window => window.IsVisible))
+                    {
+                        MainWindow.Hide();
+                        MainWindow.ShowInTaskbar = false;
+                    }
+                    else
+                    {
+                        ShowMainWindow();
+                    }
+                    break;
 
-                        var mainViewModel = DependencyInjection.Container.Resolve<MainViewModel>();
+                case MouseButtons.Middle:
+                    if (!Settings.TrayIconOptimizeOnMiddleMouseClick)
+                        return;
 
-                        if (mainViewModel.OptimizeCommand.CanExecute(null))
-                            mainViewModel.OptimizeCommand.Execute(null);
-                        break;
-                }
+                    var mainViewModel = DependencyInjection.Container.Resolve<MainViewModel>();
+
+                    if (mainViewModel.OptimizeCommand.CanExecute(null))
+                        mainViewModel.OptimizeCommand.Execute(null);
+                    break;
             }
+        }
+
+        /// <summary>
+        /// Restores and activates the existing main window from the notification area.
+        /// </summary>
+        public static void ShowMainWindow()
+        {
+            var app = Current;
+            if (app == null || app.Dispatcher.HasShutdownStarted)
+                return;
+
+            if (!app.Dispatcher.CheckAccess())
+            {
+                app.Dispatcher.BeginInvoke(new Action(ShowMainWindow), DispatcherPriority.Normal);
+                return;
+            }
+
+            var window = app.MainWindow;
+            if (window == null)
+                return;
+
+            window.ShowInTaskbar = true;
+            window.ShowActivated = true;
+            if (window.WindowState != WindowState.Normal)
+                window.WindowState = WindowState.Normal;
+            window.Show();
+            window.Activate();
+            window.Topmost = true;
+            window.Topmost = Settings.AlwaysOnTop;
+
+            var dialog = window.OwnedWindows.Cast<Window>().FirstOrDefault(owned => owned.IsVisible);
+            if (dialog != null)
+            {
+                dialog.Activate();
+                return;
+            }
+
+            window.Dispatcher.BeginInvoke((Action)(() =>
+            {
+                if (!window.IsVisible)
+                    return;
+
+                var optimizeButton = window.FindName("Optimize") as UIElement;
+                if (optimizeButton != null && optimizeButton.IsEnabled && optimizeButton.IsVisible)
+                {
+                    Keyboard.Focus(optimizeButton);
+                    FocusManager.SetFocusedElement(window, optimizeButton);
+                }
+            }), DispatcherPriority.Input);
         }
 
         /// <summary>
@@ -399,13 +389,12 @@ namespace WinMemoryCleaner
                 Initialize();
 
                 var commandLineArguments = startupEvent != null ? startupEvent.Args.Select(arg => arg.Replace("-", "/").Trim()).ToArray() : null;
+                var automaticStartup = commandLineArguments != null && commandLineArguments.Any(arg =>
+                    arg.TrimStart('/').Equals(Constants.App.CommandLineArgument.Startup, StringComparison.OrdinalIgnoreCase));
                 var memoryAreas = Enums.Memory.Areas.None;
 
                 if (commandLineArguments != null)
                 {
-                    // Update to the latest version
-                    Updater.Update(commandLineArguments);
-
                     // Process command‑line arguments
                     foreach (var argument in commandLineArguments.Select(arg => arg.Replace("/", string.Empty)))
                     {
@@ -431,30 +420,47 @@ namespace WinMemoryCleaner
                         if (argument.Equals(Constants.App.CommandLineArgument.Uninstall, StringComparison.OrdinalIgnoreCase))
                             startupType = Enums.StartupType.Uninstallation;
 
-                        // Notify version update
-                        if (argument.Equals(Version.ToString()))
-                            _notifications.Add(string.Format(Localizer.Culture, Localizer.String.UpdatedToVersion, string.Format(Localizer.Culture, Constants.App.VersionFormat, Version.Major, Version.Minor, Version.Build)));
                     }
                 }
 
                 switch (startupType)
                 {
                     case Enums.StartupType.App:
+                        bool createdShowWindowEvent;
+                        _showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset,
+                            Constants.App.Id + ".ShowWindow", out createdShowWindowEvent);
+
                         if (_isRunning)
                         {
                             try
                             {
-                                var appHandle = NativeMethods.FindWindow(null, Constants.App.Title);
-
-                                if (appHandle != IntPtr.Zero && NativeMethods.IsWindowVisible(appHandle))
+                                if (!automaticStartup)
                                 {
-                                    int appId;
+                                    var appHandle = NativeMethods.FindWindow(null, Constants.App.Title);
 
-                                    if (NativeMethods.GetWindowThreadProcessId(appHandle, out appId) != Constants.Windows.SystemErrorCode.ErrorSuccess)
-                                        NativeMethods.AllowSetForegroundWindow(appId);
+                                    if (appHandle != IntPtr.Zero)
+                                    {
+                                        int appId;
+                                        if (NativeMethods.GetWindowThreadProcessId(appHandle, out appId) != Constants.Windows.SystemErrorCode.ErrorSuccess)
+                                            NativeMethods.AllowSetForegroundWindow(appId);
+                                    }
 
-                                    NativeMethods.ShowWindowAsync(appHandle, Constants.Windows.ShowWindow.Restore);
-                                    NativeMethods.SetForegroundWindow(appHandle);
+                                    // The event also works before the first window has been shown.
+                                    _showWindowEvent.Set();
+
+                                    // Allow a previous build without the activation event to be restored.
+                                    if (createdShowWindowEvent)
+                                    {
+                                        if (appHandle != IntPtr.Zero)
+                                        {
+                                            NativeMethods.ShowWindowAsync(appHandle, Constants.Windows.ShowWindow.Restore);
+                                            NativeMethods.SetForegroundWindow(appHandle);
+                                        }
+                                        else
+                                        {
+                                            ShowDialog("An earlier instance of Windows Memory Cleaner is running without a window. End WinMemoryCleaner.exe in Task Manager, then launch this executable again.");
+                                        }
+                                    }
                                 }
                             }
                             finally
@@ -478,29 +484,20 @@ namespace WinMemoryCleaner
                         // DI/IOC
                         DependencyInjection.Container.Register(_notifyIcon);
 
-                        var mainWindow = new MainWindow();
+                        MainWindow = new MainWindow();
+                        new WindowInteropHelper(MainWindow).EnsureHandle();
 
-                        if (!Settings.StartMinimized)
-                        {
-                            mainWindow.Show();
-                            mainWindow.Activate();
-                            mainWindow.Focus();
-                            mainWindow.Topmost = true;
-                            mainWindow.Topmost = Settings.AlwaysOnTop;
-                        }
+                        _showWindowWait = ThreadPool.RegisterWaitForSingleObject(_showWindowEvent,
+                            (state, timedOut) => ShowMainWindow(), null, Timeout.Infinite, false);
+
+                        // A direct launch must remain accessible even when logon starts are hidden.
+                        if (!automaticStartup || !Settings.StartMinimized)
+                            ShowMainWindow();
 
                         // Subscribe to power events
                         SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
-                        // Process notifications
-                        foreach (var notification in _notifications)
-                        {
-                            Logger.Information(notification);
-                            DependencyInjection.Container.Resolve<INotificationService>().Notify(notification);
-                        }
-
                         RunOnStartup(Settings.RunOnStartup);
-                        ReleaseMemory();
                         break;
 
                     case Enums.StartupType.Installation:
@@ -532,7 +529,6 @@ namespace WinMemoryCleaner
                             }
 
                             Settings.Reset(keepLanguage: true); // Reset settings to defaults while preserving language preference
-                            Settings.AutoUpdate = false;        // Disable auto-update to prevent potential update-related issues
                             
                             Settings.Save();
 
@@ -594,31 +590,11 @@ namespace WinMemoryCleaner
         }
 
         /// <summary>
-        /// Releases the app memory
+        /// Allows an inexpensive collection without evicting the application's working set.
         /// </summary>
         public static void ReleaseMemory()
         {
-            // Garbage Collector
-            try
-            {
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
-                GC.WaitForPendingFinalizers();
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
-            }
-            catch
-            {
-                // ignored
-            }
-
-            // Optimize App Working Set
-            try
-            {
-                NativeMethods.EmptyWorkingSet(Process.GetCurrentProcess().Handle);
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
+            GC.Collect(0, GCCollectionMode.Optimized);
         }
 
         /// <summary>
@@ -681,6 +657,7 @@ namespace WinMemoryCleaner
 	                                <Actions Context=""Author"">
 		                                <Exec>
 			                                <Command>""{1}""</Command>
+			                                <Arguments>/{5}</Arguments>
 		                                </Exec>
 	                                </Actions>
                                 </Task>",
@@ -688,7 +665,8 @@ namespace WinMemoryCleaner
                                 Path,
                                 WindowsIdentity.GetCurrent().User.Value,
                                 string.Format(CultureInfo.InvariantCulture, "WMC {0} ({1})", string.Format(Localizer.Culture, Constants.App.VersionFormat, Version.Major, Version.Minor, Version.Build), Environment.UserName),
-                                DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                                DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture),
+                                Constants.App.CommandLineArgument.Startup
                             );
 
                                 var tempXmlFile = System.IO.Path.GetTempFileName();
@@ -728,7 +706,7 @@ namespace WinMemoryCleaner
 
                         var createStartInfo = new ProcessStartInfo("schtasks")
                         {
-                            Arguments = string.Format(CultureInfo.InvariantCulture, @"/CREATE /F /SC ONLOGON /TN ""{0}"" /TR ""{1}"" /RU ""{2}""", Constants.App.Title, Path, Environment.UserName),
+                            Arguments = string.Format(CultureInfo.InvariantCulture, @"/CREATE /F /SC ONLOGON /TN ""{0}"" /TR ""\""{1}\"" /{3}"" /RU ""{2}""", Constants.App.Title, Path, Environment.UserName, Constants.App.CommandLineArgument.Startup),
                             CreateNoWindow = true,
                             UseShellExecute = false,
                             WindowStyle = ProcessWindowStyle.Hidden,
@@ -775,29 +753,25 @@ namespace WinMemoryCleaner
             bool priorityBoostEnabled;
             ProcessPriorityClass processPriorityClass;
             ThreadPriority threadPriority;
-            ThreadPriorityLevel threadPriorityLevel;
 
             switch (priority)
             {
                 case Enums.Priority.Low:
-                    priorityBoostEnabled = false;
-                    processPriorityClass = ProcessPriorityClass.Idle;
-                    threadPriority = ThreadPriority.Lowest;
-                    threadPriorityLevel = ThreadPriorityLevel.Idle;
+                    priorityBoostEnabled = true;
+                    processPriorityClass = ProcessPriorityClass.BelowNormal;
+                    threadPriority = ThreadPriority.BelowNormal;
                     break;
 
                 case Enums.Priority.Normal:
                     priorityBoostEnabled = true;
                     processPriorityClass = ProcessPriorityClass.Normal;
                     threadPriority = ThreadPriority.Normal;
-                    threadPriorityLevel = ThreadPriorityLevel.Normal;
                     break;
 
                 case Enums.Priority.High:
                     priorityBoostEnabled = true;
                     processPriorityClass = ProcessPriorityClass.High;
                     threadPriority = ThreadPriority.Highest;
-                    threadPriorityLevel = ThreadPriorityLevel.Highest;
                     break;
 
                 default:
@@ -806,7 +780,10 @@ namespace WinMemoryCleaner
 
             try
             {
-                Thread.CurrentThread.Priority = threadPriority;
+                // Keep input and rendering responsive; only lower the calling worker.
+                Thread.CurrentThread.Priority = Current != null && Current.Dispatcher.CheckAccess()
+                    ? ThreadPriority.Normal
+                    : threadPriority;
             }
             catch
             {
@@ -815,31 +792,11 @@ namespace WinMemoryCleaner
 
             try
             {
-                var process = Process.GetCurrentProcess();
-
-                try
-                {
-                    process.PriorityBoostEnabled = priorityBoostEnabled;
-                }
-                catch
-                {
-                    // ignored
-                }
-
-                try
-                {
-                    process.PriorityClass = processPriorityClass;
-                }
-                catch
-                {
-                    // ignored
-                }
-
-                foreach (ProcessThread thread in process.Threads)
+                using (var process = Process.GetCurrentProcess())
                 {
                     try
                     {
-                        thread.PriorityBoostEnabled = priorityBoostEnabled;
+                        process.PriorityBoostEnabled = priorityBoostEnabled;
                     }
                     catch
                     {
@@ -848,7 +805,7 @@ namespace WinMemoryCleaner
 
                     try
                     {
-                        thread.PriorityLevel = threadPriorityLevel;
+                        process.PriorityClass = processPriorityClass;
                     }
                     catch
                     {

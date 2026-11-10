@@ -24,9 +24,6 @@ namespace WinMemoryCleaner
         {
             // Services
             NotificationService = notificationService;
-
-            // Commands
-            NavigateUriCommand = new RelayCommand<Uri>(Navigate);
         }
 
         #endregion
@@ -72,45 +69,7 @@ namespace WinMemoryCleaner
 
         #endregion
 
-        #region Commands
-
-        /// <summary>
-        /// Gets the navigate URI command.
-        /// </summary>
-        /// <value>
-        /// The navigate URI command.
-        /// </value>
-        public ICommand NavigateUriCommand { get; private set; }
-
-        #endregion
-
-        #region Actions
-
-        /// <summary>
-        /// Occurs when [on navigate URI command completed].
-        /// </summary>
-        public event Action OnNavigateUriCommandCompleted;
-
-        #endregion
-
         #region Methods
-
-        /// <summary>  
-        /// Navigates the specified URI.  
-        /// </summary>  
-        /// <param name="uri">The URI.</param>  
-        protected void Navigate(Uri uri)
-        {
-            App.Navigate(uri);
-
-            if (OnNavigateUriCommandCompleted != null)
-            {
-                System.Windows.Application.Current.Dispatcher.Invoke((Action)delegate
-                {
-                    OnNavigateUriCommandCompleted();
-                });
-            }
-        }
 
         /// <summary>
         /// Displays a Notification

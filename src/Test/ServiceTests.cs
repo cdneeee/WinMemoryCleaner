@@ -1,7 +1,9 @@
 using NUnit.Framework;
 using System;
+using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
@@ -271,6 +273,146 @@ namespace WinMemoryCleaner.Test
 
                 Assert.IsNotNull(_notifyIcon.ContextMenuStrip);
                 Assert.IsTrue(_notifyIcon.ContextMenuStrip.Items.Count > 0);
+            }
+
+            [Test]
+            public void Loading_KeepsTrayMenuAvailable()
+            {
+                EnsureApplication();
+                _notificationService.Loading(true);
+
+                try
+                {
+                    Assert.IsTrue(_notifyIcon.ContextMenuStrip.Enabled);
+                    Assert.AreEqual(Constants.App.Title, _notifyIcon.ContextMenuStrip.Items[0].Text);
+                    Assert.IsTrue(_notifyIcon.ContextMenuStrip.Items[0].Enabled);
+                }
+                finally
+                {
+                    _notificationService.Loading(false);
+                }
+            }
+
+            [TestCase(System.Windows.WindowState.Normal, false)]
+            [TestCase(System.Windows.WindowState.Minimized, false)]
+            [TestCase(System.Windows.WindowState.Maximized, false)]
+            [TestCase(System.Windows.WindowState.Normal, true)]
+            [TestCase(System.Windows.WindowState.Minimized, true)]
+            [TestCase(System.Windows.WindowState.Maximized, true)]
+            public void WindowActivation_ShowsNormalSizedWindow(System.Windows.WindowState initialState, bool manualLaunch)
+            {
+                EnsureApplication();
+                var app = System.Windows.Application.Current;
+                var previousWindow = app.MainWindow;
+                var previousShutdownMode = app.ShutdownMode;
+                var previousStartMinimized = Settings.StartMinimized;
+                Settings.StartMinimized = true;
+                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+                var window = new System.Windows.Window
+                {
+                    Width = 100,
+                    Height = 100,
+                    Left = -10000,
+                    Top = -10000,
+                    WindowStyle = System.Windows.WindowStyle.None,
+                    AllowsTransparency = true,
+                    ResizeMode = System.Windows.ResizeMode.NoResize,
+                    SizeToContent = System.Windows.SizeToContent.WidthAndHeight,
+                    Content = new System.Windows.Controls.Border { Width = 100, Height = 100 },
+                    ShowActivated = false,
+                    ShowInTaskbar = false
+                };
+                app.MainWindow = window;
+
+                try
+                {
+                    if (initialState != System.Windows.WindowState.Normal)
+                    {
+                        window.Show();
+                        window.WindowState = initialState;
+                    }
+
+                    if (manualLaunch)
+                        RunWorkerWithoutUiWait(App.ShowMainWindow);
+                    else
+                        _notifyIcon.ContextMenuStrip.Items[0].PerformClick();
+
+                    Assert.IsTrue(window.IsVisible);
+                    Assert.IsTrue(window.ShowInTaskbar);
+                    Assert.AreEqual(System.Windows.WindowState.Normal, window.WindowState);
+                    Assert.AreEqual(100, window.ActualWidth, "Restored width should fit the content.");
+                    Assert.AreEqual(100, window.ActualHeight, "Restored height should fit the content.");
+                }
+                finally
+                {
+                    window.Close();
+                    app.MainWindow = previousWindow;
+                    app.ShutdownMode = previousShutdownMode;
+                    Settings.StartMinimized = previousStartMinimized;
+                }
+            }
+
+            [Test]
+            public void Update_FromWorker_DoesNotWaitForUiThread()
+            {
+                EnsureApplication();
+                var showMemoryUsage = Settings.TrayIconShowMemoryUsage;
+                Settings.TrayIconShowMemoryUsage = false;
+
+                try
+                {
+                    RunWorkerWithoutUiWait(() => _notificationService.Update(new Memory(Mocker.CreateMemoryStatusEx()), true));
+                    RunWorkerWithoutUiWait(() => _notificationService.Update(new Memory(Mocker.CreateMemoryStatusEx()), false));
+                    Assert.IsNotEmpty(_notifyIcon.Text);
+                }
+                finally
+                {
+                    Settings.TrayIconShowMemoryUsage = showMemoryUsage;
+                }
+            }
+
+            [Test]
+            public void Loading_FromWorker_DoesNotWaitForUiThread()
+            {
+                EnsureApplication();
+                try
+                {
+                    RunWorkerWithoutUiWait(() => _notificationService.Loading(true));
+                    Assert.IsTrue(_notifyIcon.ContextMenuStrip.Enabled);
+                }
+                finally
+                {
+                    _notificationService.Loading(false);
+                }
+            }
+
+            private static void EnsureApplication()
+            {
+                var app = System.Windows.Application.Current ?? new System.Windows.Application();
+                Assert.IsTrue(app.Dispatcher.CheckAccess());
+            }
+
+            private static void RunWorkerWithoutUiWait(Action action)
+            {
+                Exception error = null;
+                var worker = new Thread(() =>
+                {
+                    try { action(); }
+                    catch (Exception ex) { error = ex; }
+                }) { IsBackground = true };
+                worker.Start();
+
+                var completedWithoutUi = worker.Join(2000);
+
+                // Drain pending UI work, including on failure, so the worker can exit.
+                var frame = new DispatcherFrame();
+                System.Windows.Application.Current.Dispatcher.BeginInvoke(
+                    new Action(() => frame.Continue = false), DispatcherPriority.ContextIdle);
+                Dispatcher.PushFrame(frame);
+
+                Assert.IsTrue(worker.Join(2000), "The notification worker did not finish.");
+                Assert.IsNull(error);
+                Assert.IsTrue(completedWithoutUi, "The notification worker blocked waiting for the UI thread.");
             }
 
             [Test]

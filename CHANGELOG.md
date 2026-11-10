@@ -1,3 +1,12 @@
+### 3.1.0
+
+- Fixed standalone executable startup by keeping the NUnit apartment setting in the test runner instead of application assembly attributes.
+- Manual launches now show the main window at its normal size, including when another instance is hidden. Start minimized applies to automatic logon launches.
+- Removed update checks, executable downloads and replacement, and browser navigation. About information is displayed locally.
+- Improved tray opening by removing forced full garbage collections and working set trimming when showing or hiding the window.
+- Fixed a tray animation deadlock and background monitoring loops that consumed CPU while busy.
+- Added a tray menu entry to restore the main window, including when minimized or optimizing.
+
 ### 3.0.8
 
 **2025-12-13**

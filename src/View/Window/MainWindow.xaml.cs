@@ -42,7 +42,6 @@ namespace WinMemoryCleaner
             {
                 _viewModel.OnAddProcessToExclusionListCommandCompleted += OnAddProcessToExclusionListCommandCompleted;
                 _viewModel.OnLanguageChangeCompleted += Refresh;
-                _viewModel.OnNavigateUriCommandCompleted += OnNavigateUriCommandCompleted;
                 _viewModel.OnOptimizeCommandCompleted += OnOptimizeCommandCompleted;
                 _viewModel.OnRemoveProcessFromExclusionListCommandCompleted += () => SetFocusTo(ProcessExclusionList);
             }
@@ -101,8 +100,6 @@ namespace WinMemoryCleaner
                 SetFocusTo(Optimize);
 
                 CloseToTheNotificationArea();
-
-                App.ReleaseMemory();
             }
             else
                 App.Shutdown();
@@ -129,15 +126,14 @@ namespace WinMemoryCleaner
         }
 
         /// <summary>
-        /// Called when the donate menu item is clicked.
+        /// Called when the about menu item is clicked.
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
-        private void OnDonateMenuItemClick(object sender, RoutedEventArgs e)
+        private void OnAboutMenuItemClick(object sender, RoutedEventArgs e)
         {
-            var window = new DonationWindow(this);
-
-            window.ShowDialog();
+            var message = _viewModel.Title + Environment.NewLine + Constants.App.Author.Name + Environment.NewLine + Constants.App.License;
+            MessageBox.Show(this, message, Localizer.String.About, MessageBoxButton.OK, MessageBoxImage.Information);
 
             SetFocusTo(Optimize);
         }
@@ -189,14 +185,6 @@ namespace WinMemoryCleaner
             base.OnMouseLeftButtonDown(e);
 
             DragMove();
-        }
-
-        /// <summary>
-        /// Called when the navigate URI command is completed.
-        /// </summary>
-        private void OnNavigateUriCommandCompleted()
-        {
-            SetFocusTo(Optimize);
         }
 
         /// <summary>

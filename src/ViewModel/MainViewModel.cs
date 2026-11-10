@@ -20,6 +20,7 @@ namespace WinMemoryCleaner
         #region Fields
 
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        private readonly CancellationToken _cancellationToken;
         private Computer _computer;
         private readonly IComputerService _computerService;
         private readonly IHotkeyService _hotKeyService;
@@ -49,6 +50,7 @@ namespace WinMemoryCleaner
         public MainViewModel(IComputerService computerService, IHotkeyService hotKeyService, INotificationService notificationService)
             : base(notificationService)
         {
+            _cancellationToken = _cancellationTokenSource.Token;
             _computerService = computerService;
             _hotKeyService = hotKeyService;
 
@@ -69,8 +71,6 @@ namespace WinMemoryCleaner
             {
                 _computerService = new ComputerService();
                 _hotKeyService = new HotkeyService();
-
-                Settings.AutoUpdate = true;
 
                 Computer.OperatingSystem.IsWindows81OrGreater = true;
                 Computer.OperatingSystem.IsWindows8OrGreater = true;
@@ -211,33 +211,6 @@ namespace WinMemoryCleaner
         public string AutoOptimizationMemoryUsageWarning
         {
             get { return string.Format(Localizer.Culture, Localizer.String.AutoOptimizationInterval, Constants.App.AutoOptimizationMemoryUsageInterval); }
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether [automatic update].
-        /// </summary>
-        /// <value>
-        ///   <c>true</c> if [automatic update]; otherwise, <c>false</c>.
-        /// </value>
-        public bool AutoUpdate
-        {
-            get { return Settings.AutoUpdate; }
-            set
-            {
-                try
-                {
-                    IsBusy = true;
-
-                    Settings.AutoUpdate = Helper.IsAutoUpdateSupported && value;
-                    Settings.Save();
-
-                    RaisePropertyChanged();
-                }
-                finally
-                {
-                    IsBusy = false;
-                }
-            }
         }
 
         /// <summary>
@@ -933,7 +906,6 @@ namespace WinMemoryCleaner
                     new List<ObservableItem<bool>>
                     {
                        new ObservableItem<bool>(Localizer.String.AlwaysOnTop, () => AlwaysOnTop, value => AlwaysOnTop = value),
-                       new ObservableItem<bool>(Localizer.String.AutoUpdate, () => AutoUpdate, value => AutoUpdate = value, Helper.IsAutoUpdateSupported),
                        new ObservableItem<bool>(Localizer.String.CloseAfterOptimization, () => CloseAfterOptimization, value => CloseAfterOptimization = value),
                        new ObservableItem<bool>(Localizer.String.CloseToTheNotificationArea, () => CloseToTheNotificationArea, value => CloseToTheNotificationArea = value),
                        new ObservableItem<bool>(Localizer.String.CreateStartMenuShortcut, () => CreateStartMenuShortcut, value => CreateStartMenuShortcut = value),
@@ -1613,20 +1585,16 @@ namespace WinMemoryCleaner
         /// </summary>
         private void MonitorApp()
         {
-            while (!_cancellationTokenSource.Token.IsCancellationRequested)
+            while (!_cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    // Check if it's busy
-                    if (IsBusy)
-                        continue;
-
                     // Delay
-                    if (_cancellationTokenSource.Token.WaitHandle.WaitOne(60000))
+                    if (WaitForMonitor(60000))
                         break;
 
-                    // Update app
-                    Updater.Update();
+                    if (IsBusy)
+                        continue;
 
                     // App priority
                     App.SetPriority(Settings.RunOnPriority);
@@ -1700,7 +1668,7 @@ namespace WinMemoryCleaner
             // App priority
             App.SetPriority(Settings.RunOnPriority);
 
-            while (!_cancellationTokenSource.Token.IsCancellationRequested)
+            while (!_cancellationToken.IsCancellationRequested)
             {
                 try
                 {
@@ -1719,14 +1687,28 @@ namespace WinMemoryCleaner
                         NotificationService.Update(Computer.Memory, IsOptimizationRunning);
                     }
 
-                    // Delay
-                    if (_cancellationTokenSource.Token.WaitHandle.WaitOne(5000))
-                        break;
                 }
                 catch (Exception e)
                 {
                     Logger.Debug(e);
                 }
+                finally
+                {
+                    // Also wait when busy or after an error, avoiding a CPU spin.
+                    WaitForMonitor(5000);
+                }
+            }
+        }
+
+        private bool WaitForMonitor(int milliseconds)
+        {
+            try
+            {
+                return _cancellationToken.IsCancellationRequested || _cancellationToken.WaitHandle.WaitOne(milliseconds);
+            }
+            catch (ObjectDisposedException)
+            {
+                return true;
             }
         }
 

@@ -100,10 +100,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="View\Window\DonationWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
     <Page Include="View\Window\MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -131,7 +127,6 @@
     <Compile Include="Core\Settings.cs" />
     <Compile Include="Core\Structs.cs" />
     <Compile Include="Core\ThemeManager.cs" />
-    <Compile Include="Core\Updater.cs" />
     <Compile Include="Interfaces\IComputerService.cs" />
     <Compile Include="Interfaces\IJsonSerializable.cs" />
     <Compile Include="Interfaces\IHotkeyService.cs" />
@@ -174,15 +169,11 @@
     <Compile Include="View\Dialog\MessageDialog.xaml.cs">
       <DependentUpon>MessageDialog.xaml</DependentUpon>
     </Compile>
-    <Compile Include="View\Window\DonationWindow.xaml.cs">
-      <DependentUpon>DonationWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="View\Window\MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="ViewModel\Base\ViewModel.cs" />
-    <Compile Include="ViewModel\DonationViewModel.cs" />
     <Compile Include="ViewModel\MainViewModel.cs" />
     <Compile Include="ViewModel\MessageViewModel.cs" />
     <Compile Include="ViewModel\ViewModelLocator.cs" />

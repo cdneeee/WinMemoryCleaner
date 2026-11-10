@@ -25,7 +25,6 @@ namespace WinMemoryCleaner
                 notificationService = DependencyInjection.Container.Resolve<INotificationService>();
             }
 
-            DonationViewModel = new DonationViewModel(notificationService);
             MainViewModel = new MainViewModel(computerService, hotKeyService, notificationService);
             MessageViewModel = new MessageViewModel(notificationService);
         }
@@ -66,21 +65,6 @@ namespace WinMemoryCleaner
         #endregion
 
         #region Properties
-
-        /// <summary>
-        /// Donation View Model
-        /// </summary>
-        public DonationViewModel DonationViewModel
-        {
-            get
-            {
-                return DependencyInjection.Container.Resolve<DonationViewModel>();
-            }
-            private set
-            {
-                DependencyInjection.Container.Register(value);
-            }
-        }
 
         /// <summary>
         /// Main View Model

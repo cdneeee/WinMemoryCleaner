@@ -12,7 +12,6 @@ namespace WinMemoryCleaner
         public static class App
         {
             public const int AutoOptimizationMemoryUsageInterval = 5; // Minute
-            public const int AutoUpdateInterval = 24; // Hour
             public const string EmbeddedResourcePath = "WinMemoryCleaner.Resources.";
             public const string EmbeddedResourcePathExtension = ".json";
             public const string Id = "C7F29A45-8B3E-4D2F-9A1C-5E7B2D4F8C6A";
@@ -48,20 +47,13 @@ namespace WinMemoryCleaner
                 public const string Install = "Install";
                 public const string Reset = "Reset";
                 public const string Service = "Service";
+                public const string Startup = "Startup";
                 public const string Uninstall = "Uninstall";
             }
 
             public static class Defaults
             {
                 public static readonly string Path = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            }
-
-            public static class Donation
-            {
-                public static readonly Uri BitcoinUri = new Uri("https://www.blockchain.com/explorer/addresses/btc/bc1qu884q5r2uqugvdhyk8l6waakumeve7jykqp7ap");
-                public static readonly Uri EthereumUri = new Uri("https://www.blockchain.com/explorer/addresses/eth/0xb71A94733B0578D155D9A765E0d2C4dA0f44156d");
-                public static readonly Uri GitHubSponsorUri = new Uri("https://github.com/sponsors/IgorMundstein");
-                public static readonly Uri KofiUri = new Uri("https://ko-fi.com/igormundstein");
             }
 
             public static class Registry
@@ -73,17 +65,6 @@ namespace WinMemoryCleaner
                 }
             }
 
-            public static class Repository
-            {
-                private const string GitHub = "https://github.com/IgorMundstein/WinMemoryCleaner";
-                private const string GitHubRaw = "https://raw.githubusercontent.com/IgorMundstein/WinMemoryCleaner/main";
-
-                public static readonly Uri AboutUri = new Uri(GitHub + "?tab=readme-ov-file#windows-memory-cleaner");
-                public static readonly Uri AssemblyInfoUri = new Uri(GitHubRaw + "/src/Properties/AssemblyInfo.cs");
-                public static readonly Uri DownloadUri = new Uri(GitHub + "?tab=readme-ov-file#-download");
-                public static readonly Uri LatestExeUri = new Uri(GitHub + "/releases/latest/download/WinMemoryCleaner.exe");
-                public static readonly Uri Uri = new Uri(GitHub);
-            }
         }
 
         public static class Windows

@@ -24,6 +24,7 @@ namespace WinMemoryCleaner
         private bool _disposed;
         private readonly Icon _imageIcon;
         private readonly NotifyIcon _notifyIcon;
+        private ToolStripItem _optimizeMenuItem;
         private readonly object _disposeLock = new object();
         private DispatcherTimer _rotationTimer;
 
@@ -53,10 +54,16 @@ namespace WinMemoryCleaner
                 return;
 
             // Notification Areas (Menu)
+            if (_notifyIcon.ContextMenuStrip != null)
+                _notifyIcon.ContextMenuStrip.Dispose();
             _notifyIcon.ContextMenuStrip = new TrayIconContextMenuControl();
 
+            // Keep the window accessible while optimization is running.
+            _notifyIcon.ContextMenuStrip.Items.Add(Constants.App.Title, null, (sender, args) => App.ShowMainWindow());
+            _notifyIcon.ContextMenuStrip.Items.Add(new ToolStripSeparator());
+
             // Optimize
-            _notifyIcon.ContextMenuStrip.Items.Add(Localizer.String.Optimize, null, (sender, args) =>
+            _optimizeMenuItem = _notifyIcon.ContextMenuStrip.Items.Add(Localizer.String.Optimize, null, (sender, args) =>
             {
                 var mainViewModel = DependencyInjection.Container.Resolve<MainViewModel>();
 
@@ -158,6 +165,12 @@ namespace WinMemoryCleaner
 
                 try
                 {
+                    if (_optimizeMenuItem != null)
+                    {
+                        _optimizeMenuItem.Dispose();
+                        _optimizeMenuItem = null;
+                    }
+
                     if (_notifyIcon != null)
                         _notifyIcon.Dispose();
                 }
@@ -471,22 +484,42 @@ namespace WinMemoryCleaner
         }
 
         /// <summary>
-        /// Shows or hides the loading cursor and enables/disables the context menu
+        /// Shows or hides the loading cursor while keeping the tray menu available.
         /// </summary>
-        /// <param name="running">if set to <c>true</c> shows loading cursor and disables menu</param>
+        /// <param name="running">if set to <c>true</c> shows the loading cursor.</param>
         public void Loading(bool running)
         {
             if (WpfApplication.Current == null || WpfApplication.Current.Dispatcher == null)
                 return;
 
-            // Multi-threading trick
-            WpfApplication.Current.Dispatcher.Invoke((Action)delegate
+            RunOnUiThread(delegate
             {
-                Mouse.OverrideCursor = running ? Cursors.Wait : null;
+                if (_disposed)
+                    return;
 
-                if (_notifyIcon.ContextMenuStrip != null)
-                    _notifyIcon.ContextMenuStrip.Enabled = !running;
+                Mouse.OverrideCursor = running ? Cursors.Wait : null;
+                if (_optimizeMenuItem != null)
+                    _optimizeMenuItem.Enabled = !running;
             });
+        }
+
+        private static void RunOnUiThread(Action action)
+        {
+            var app = WpfApplication.Current;
+            if (app == null)
+            {
+                action();
+                return;
+            }
+
+            var dispatcher = app.Dispatcher;
+            if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+                return;
+
+            if (dispatcher.CheckAccess())
+                action();
+            else
+                dispatcher.BeginInvoke(action, DispatcherPriority.Background);
         }
 
         /// <summary>
@@ -498,14 +531,16 @@ namespace WinMemoryCleaner
         /// <param name="icon">The notification icon type</param>
         public void Notify(string message, string title = null, int timeout = 5, Enums.Icon.Notification icon = Enums.Icon.Notification.None)
         {
-            if (_notifyIcon == null)
+            RunOnUiThread(() => ShowNotification(message, title, timeout, icon));
+        }
+
+        private void ShowNotification(string message, string title, int timeout, Enums.Icon.Notification icon)
+        {
+            if (_disposed || _notifyIcon == null)
                 return;
 
             try
             {
-                _notifyIcon.Visible = false;
-                _notifyIcon.Visible = true;
-
                 _notifyIcon.ShowBalloonTip(timeout * 1000, title, message, (ToolTipIcon)icon);
             }
             catch (Exception ex)
@@ -632,6 +667,13 @@ namespace WinMemoryCleaner
             if (memory == null)
                 throw new ArgumentNullException("memory");
 
+            // Dispatch before taking the icon lock. A worker holding the lock while
+            // waiting for the dispatcher can deadlock with the UI animation timer.
+            RunOnUiThread(() => UpdateIcon(memory, isOptimizing));
+        }
+
+        private void UpdateIcon(Memory memory, bool isOptimizing)
+        {
             lock (_disposeLock)
             {
                 if (_disposed || _notifyIcon == null)

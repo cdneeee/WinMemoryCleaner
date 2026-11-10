@@ -199,30 +199,6 @@ namespace WinMemoryCleaner
         }
 
         /// <summary>
-        /// Determines if the current Windows version supports updates via GitHub TLS/SNI.
-        /// Returns false for legacy Windows versions (XP/2003) that cannot reach GitHub.
-        /// </summary>
-        /// <returns>True if updates are supported; otherwise, false.</returns>
-        public static bool IsAutoUpdateSupported
-        {
-            get
-            {
-                try
-                {
-                    var os = Environment.OSVersion;
-
-                    if (os.Version != null && os.Version.Major < 6)
-                        return false; // Windows XP/2003 and earlier
-                }
-                catch
-                {
-                }
-
-                return true;
-            }
-        }
-
-        /// <summary>
         /// Gets the string name of a property or field.
         /// </summary>
         /// <typeparam name="T">The type of the member.</typeparam>

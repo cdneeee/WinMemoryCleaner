@@ -1,5 +1,11 @@
 # Windows Memory Cleaner
 
+This fork runs offline: it has no update checks, executable downloads, or browser links. The About menu displays information locally. Build this checkout to use these changes; the upstream download and package links below provide the original application.
+
+Left-click the tray icon to show or hide the window, or right-click it and select **Windows Memory Cleaner** to restore it. The tray menu remains available during optimization.
+
+Launching the executable manually shows the main window at its normal size, including when an instance is already hidden in the tray. **Start Minimized** applies to automatic Windows logon launches (`/Startup`). The executable can be copied on its own; `nunit.framework.dll` is only needed to run tests. Run NUnit with `/apartment:STA` so WPF tests share a single UI thread.
+
 [![](https://img.shields.io/badge/WINDOWS-XP%20%E2%80%93%2011-blue?style=for-the-badge)](#windows-memory-cleaner) [![](https://img.shields.io/badge/SERVER-2003%20%E2%80%93%202025-blue?style=for-the-badge)](#windows-memory-cleaner) [![](https://img.shields.io/github/license/IgorMundstein/WinMemoryCleaner?color=2ea44f&style=for-the-badge)](/LICENSE) [![](https://img.shields.io/github/downloads/IgorMundstein/WinMemoryCleaner/total?color=orange&style=for-the-badge)](https://github.com/IgorMundstein/WinMemoryCleaner/releases/latest)
 
 WMC is a free RAM cleaner that effectively optimizes memory areas by utilizing the native Windows API. This can help improve performance when programs do not properly release allocated memory. Featuring a user-friendly interface and intelligent functionality, this portable application requires no installation; however, it does need administrator privileges to run.

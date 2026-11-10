@@ -81,7 +81,7 @@ jobs:
           }
           
           Write-Host "Running tests..."
-          & $testRunner $testAssembly /xml:TestResults.xml
+          & $testRunner $testAssembly /apartment:STA /xml:TestResults.xml
           
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::error::Tests failed with exit code $LASTEXITCODE"

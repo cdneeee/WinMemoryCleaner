@@ -22,12 +22,6 @@ namespace WinMemoryCleaner.Test
             }
 
             [Test]
-            public void App_AutoUpdateInterval_Is24Hours()
-            {
-                Assert.AreEqual(24, Constants.App.AutoUpdateInterval);
-            }
-
-            [Test]
             public void App_Author_Name_IsNotEmpty()
             {
                 Assert.IsNotNull(Constants.App.Author.Name);
@@ -60,34 +54,6 @@ namespace WinMemoryCleaner.Test
             }
 
             [Test]
-            public void App_Donation_BitcoinUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Donation.BitcoinUri);
-                Assert.IsTrue(Constants.App.Donation.BitcoinUri.IsAbsoluteUri);
-            }
-
-            [Test]
-            public void App_Donation_EthereumUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Donation.EthereumUri);
-                Assert.IsTrue(Constants.App.Donation.EthereumUri.IsAbsoluteUri);
-            }
-
-            [Test]
-            public void App_Donation_GitHubSponsorUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Donation.GitHubSponsorUri);
-                Assert.IsTrue(Constants.App.Donation.GitHubSponsorUri.IsAbsoluteUri);
-            }
-
-            [Test]
-            public void App_Donation_KofiUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Donation.KofiUri);
-                Assert.IsTrue(Constants.App.Donation.KofiUri.IsAbsoluteUri);
-            }
-
-            [Test]
             public void App_Id_IsValidGuid()
             {
                 var guid = Guid.Parse(Constants.App.Id);
@@ -108,36 +74,6 @@ namespace WinMemoryCleaner.Test
                 Assert.IsNotNull(Constants.App.Name);
                 Assert.IsFalse(string.IsNullOrEmpty(Constants.App.Name));
                 Assert.AreEqual("WinMemoryCleaner", Constants.App.Name);
-            }
-
-            [Test]
-            public void App_Repository_AboutUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Repository.AboutUri);
-                Assert.IsTrue(Constants.App.Repository.AboutUri.IsAbsoluteUri);
-            }
-
-            [Test]
-            public void App_Repository_DownloadUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Repository.DownloadUri);
-                Assert.IsTrue(Constants.App.Repository.DownloadUri.IsAbsoluteUri);
-            }
-
-            [Test]
-            public void App_Repository_LatestExeUri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Repository.LatestExeUri);
-                Assert.IsTrue(Constants.App.Repository.LatestExeUri.IsAbsoluteUri);
-                Assert.IsTrue(Constants.App.Repository.LatestExeUri.ToString().Contains("releases/latest"));
-            }
-
-            [Test]
-            public void App_Repository_Uri_IsValid()
-            {
-                Assert.IsNotNull(Constants.App.Repository.Uri);
-                Assert.IsTrue(Constants.App.Repository.Uri.IsAbsoluteUri);
-                Assert.IsTrue(Constants.App.Repository.Uri.ToString().Contains("github.com"));
             }
 
             [Test]
@@ -729,14 +665,6 @@ namespace WinMemoryCleaner.Test
             }
 
             [Test]
-            public void IsAutoUpdateSupported_ReturnsBoolean()
-            {
-                var isSupported = Helper.IsAutoUpdateSupported;
-
-                Assert.IsNotNull(isSupported);
-            }
-
-            [Test]
             public void NameOf_WithNullExpression_ThrowsArgumentNullException()
             {
                 Assert.Throws<ArgumentNullException>(() => Helper.NameOf<object>(null));
@@ -1098,12 +1026,6 @@ namespace WinMemoryCleaner.Test
             public void AutoOptimizationMemoryUsage_CanBeAccessed()
             {
                 Assert.DoesNotThrow(() => { var usage = Settings.AutoOptimizationMemoryUsage; });
-            }
-
-            [Test]
-            public void AutoUpdate_CanBeAccessed()
-            {
-                Assert.DoesNotThrow(() => { var autoUpdate = Settings.AutoUpdate; });
             }
 
             [Test]

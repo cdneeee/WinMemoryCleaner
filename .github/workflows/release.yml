@@ -129,7 +129,7 @@ jobs:
           }
           
           Write-Host "Running release gate tests..."
-          & $testRunner $testAssembly /xml:TestResults.xml
+          & $testRunner $testAssembly /apartment:STA /xml:TestResults.xml
           
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::error::Release aborted: Tests failed."
